@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -157,6 +159,9 @@ func main() {
 		player := update.Message.From.ID
 		if update.Message.Text == "/start" {
 			g.AddPlayer(player, solver.NewSolver(letters5, 5))
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "New game started!")
+			msg.ReplyToMessageID = update.Message.MessageID
+			bot.Send(msg)
 		}
 		notContainPrefix := "-"
 		if strings.HasPrefix(update.Message.Text, notContainPrefix) {
@@ -165,39 +170,106 @@ func main() {
 		}
 		containPrefix := "+"
 		if strings.HasPrefix(update.Message.Text, containPrefix) {
-			contains := strings.TrimLeft(update.Message.Text, notContainPrefix)
+			contains := strings.TrimLeft(update.Message.Text, containPrefix)
 			g.AddContains(player, []rune(contains))
 		}
-	}
+		correctPosition(update, g, player)
+		incorrectPosition(update, g, player)
+		if update.Message.Text == "/result" {
+			result, err := g.GetResult(player)
+			message := ""
+			if err != nil {
+				message = "Error!"
+			}
+			message = strings.Join(result, ",\n")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
+			msg.ReplyToMessageID = update.Message.MessageID
 
-	notContains := []rune{'б', 'у', 'к', 'в', 'с', 'е', 'м', 'ь', 'я', 'р', 'о', 'з'}
-	contain := []rune{'п', 'а'}
-	correctPositions := []solver.RunePlace{
-		{Rune: 'а', Pos: 4},
-		{Rune: 'п', Pos: 0},
-	}
-	incorrectPositions := []solver.RunePlace{
-		{Rune: 'у', Pos: 1},
-		{Rune: 'в', Pos: 3},
-		{Rune: 'а', Pos: 4},
-		{Rune: 'с', Pos: 0},
-		{Rune: 'а', Pos: 1},
-		{Rune: 'у', Pos: 3},
-		{Rune: 'с', Pos: 4},
-	}
-
-	s := solver.NewSolver(letters5, 5)
-	s.Contains(contain)
-	s.NotContain(notContains)
-	s.CorrectRunePlaces(correctPositions)
-	s.IncorrectRunePlaces(incorrectPositions)
-	results := s.GetSuitable()
-	fmt.Println("Matching lines:")
-	if len(results) == 0 {
-		fmt.Println("not found")
-	} else {
-		for _, el := range results {
-			fmt.Println(el)
+			_, err = bot.Send(msg)
+			if err != nil {
+				log.Println(err)
+			}
 		}
+	}
+
+	//notContains := []rune{'б', 'у', 'к', 'в', 'с', 'е', 'м', 'ь', 'я', 'р', 'о', 'з'}
+	//contain := []rune{'п', 'а'}
+	//correctPositions := []solver.RunePlace{
+	//	{Rune: 'а', Pos: 4},
+	//	{Rune: 'п', Pos: 0},
+	//}
+	//incorrectPositions := []solver.RunePlace{
+	//	{Rune: 'у', Pos: 1},
+	//	{Rune: 'в', Pos: 3},
+	//	{Rune: 'а', Pos: 4},
+	//	{Rune: 'с', Pos: 0},
+	//	{Rune: 'а', Pos: 1},
+	//	{Rune: 'у', Pos: 3},
+	//	{Rune: 'с', Pos: 4},
+	//}
+	//
+	//s := solver.NewSolver(letters5, 5)
+	//s.Contains(contain)
+	//s.NotContain(notContains)
+	//s.CorrectRunePlaces(correctPositions)
+	//s.IncorrectRunePlaces(incorrectPositions)
+	//results := s.GetSuitable()
+	//fmt.Println("Matching lines:")
+	//if len(results) == 0 {
+	//	fmt.Println("not found")
+	//} else {
+	//	for _, el := range results {
+	//		fmt.Println(el)
+	//	}
+	//}
+}
+
+func correctPosition(update tgbotapi.Update, g *game.Game, player int) {
+	re := regexp.MustCompile(`^(?P<pos>\d)\+(?P<char>[а-я])$`)
+	match := re.FindStringSubmatch(update.Message.Text)
+
+	if len(match) > 0 {
+		charIndex := re.SubexpIndex("char")
+		posIndex := re.SubexpIndex("pos")
+		if charIndex != -1 && posIndex != -1 {
+			c := runeAt(match[charIndex], 0)
+			p := match[posIndex]
+			pos, err := strconv.Atoi(p)
+			if err != nil {
+				//TODO: return error to user
+			}
+			g.AddCorrectPosition(player, c, pos)
+		}
+	} else {
+		//TODO: return error to user
+	}
+}
+
+func runeAt(s string, i int) rune {
+	runeSlice := []rune(s)
+	if i >= len(runeSlice) || i < 0 {
+		return -1
+	}
+	return runeSlice[i]
+}
+
+func incorrectPosition(update tgbotapi.Update, g *game.Game, player int) {
+	re := regexp.MustCompile(`^(?P<pos>\d)\-(?P<char>[а-я])$`)
+	match := re.FindStringSubmatch(update.Message.Text)
+
+	if len(match) > 0 {
+		charIndex := re.SubexpIndex("char")
+		posIndex := re.SubexpIndex("pos")
+		if charIndex != -1 && posIndex != -1 {
+			c := match[charIndex][0]
+			p := match[posIndex]
+			pos, err := strconv.Atoi(p)
+			if err != nil {
+				//TODO: return error to user
+			}
+			g.AddIncorrectPosition(player, rune(c), pos)
+		}
+	} else {
+		//TODO: return error to user
 	}
 }

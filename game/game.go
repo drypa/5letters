@@ -33,3 +33,29 @@ func (g *Game) AddContains(player int, runes []rune) error {
 	g.g[player].Contains(runes)
 	return nil
 }
+
+func (g *Game) AddCorrectPosition(player int, r rune, pos int) error {
+	if _, ok := g.g[player]; !ok {
+		return fmt.Errorf("player %d not found. Please /start game first", player)
+	}
+	places := make([]solver.RunePlace, 1)
+	places[0] = solver.RunePlace{Rune: r, Pos: pos}
+	g.g[player].CorrectRunePlaces(places)
+	return nil
+}
+func (g *Game) AddIncorrectPosition(player int, r rune, pos int) error {
+	if _, ok := g.g[player]; !ok {
+		return fmt.Errorf("player %d not found. Please /start game first", player)
+	}
+	places := make([]solver.RunePlace, 1)
+	places[0] = solver.RunePlace{Rune: r, Pos: pos}
+	g.g[player].IncorrectRunePlaces(places)
+	return nil
+}
+
+func (g *Game) GetResult(player int) ([]string, error) {
+	if _, ok := g.g[player]; !ok {
+		return nil, fmt.Errorf("player %d not found. Please /start game first", player)
+	}
+	return g.g[player].GetSuitable(), nil
+}

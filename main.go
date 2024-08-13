@@ -156,11 +156,17 @@ func main() {
 		}
 		player := update.Message.From.ID
 		if update.Message.Text == "/start" {
-			g.AddPlayer(player, *solver.NewSolver(letters5, 5))
+			g.AddPlayer(player, solver.NewSolver(letters5, 5))
 		}
-		if strings.HasPrefix(update.Message.Text, "-") {
-			notContains := strings.TrimLeft(update.Message.Text, "-")
-			g.NotContains(player, []rune(notContains))
+		notContainPrefix := "-"
+		if strings.HasPrefix(update.Message.Text, notContainPrefix) {
+			notContains := strings.TrimLeft(update.Message.Text, notContainPrefix)
+			g.AddNotContains(player, []rune(notContains))
+		}
+		containPrefix := "+"
+		if strings.HasPrefix(update.Message.Text, containPrefix) {
+			contains := strings.TrimLeft(update.Message.Text, notContainPrefix)
+			g.AddContains(player, []rune(contains))
 		}
 	}
 

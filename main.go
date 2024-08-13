@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"letters/game"
 	"letters/solver"
 	"log"
 	"net/http"
@@ -123,6 +125,42 @@ func main() {
 		err = writeToFile(letters5, letters5TmpPath)
 		if err != nil {
 			fmt.Println("Failed to save temp file")
+		}
+	}
+	g := game.NewGame()
+
+	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if token == "" {
+		log.Fatal("TELEGRAM_BOT_TOKEN environment variable not set")
+	}
+
+	bot, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bot.Debug = true
+	log.Printf("Authorized on account %s", bot.Self.UserName)
+
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+
+	updates, err := bot.GetUpdatesChan(u)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for update := range updates {
+		if update.Message == nil {
+			continue
+		}
+		player := update.Message.From.ID
+		if update.Message.Text == "/start" {
+			g.AddPlayer(player, *solver.NewSolver(letters5, 5))
+		}
+		if strings.HasPrefix(update.Message.Text, "-") {
+			notContains := strings.TrimLeft(update.Message.Text, "-")
+			g.NotContains(player, []rune(notContains))
 		}
 	}
 

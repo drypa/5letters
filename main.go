@@ -159,22 +159,31 @@ func main() {
 		player := update.Message.From.ID
 		if update.Message.Text == "/start" {
 			g.AddPlayer(player, solver.NewSolver(letters5, 5))
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "New game started!")
-			msg.ReplyToMessageID = update.Message.MessageID
-			bot.Send(msg)
+			sendResponse("New game started!", update, bot)
+			continue
 		}
 		notContainPrefix := "-"
 		if strings.HasPrefix(update.Message.Text, notContainPrefix) {
 			notContains := strings.TrimLeft(update.Message.Text, notContainPrefix)
-			g.AddNotContains(player, []rune(notContains))
+			count, err := g.AddNotContains(player, []rune(notContains))
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+			continue
 		}
 		containPrefix := "+"
 		if strings.HasPrefix(update.Message.Text, containPrefix) {
 			contains := strings.TrimLeft(update.Message.Text, containPrefix)
-			g.AddContains(player, []rune(contains))
+			count, err := g.AddContains(player, []rune(contains))
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+			continue
 		}
-		correctPosition(update, g, player)
-		incorrectPosition(update, g, player)
+		correctPosition(update, g, player, bot)
+		incorrectPosition(update, g, player, bot)
 		if update.Message.Text == "/result" {
 			result, err := g.GetResult(player)
 			message := ""
@@ -224,7 +233,13 @@ func main() {
 	//}
 }
 
-func correctPosition(update tgbotapi.Update, g *game.Game, player int) {
+func sendResponse(message string, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
+	msg.ReplyToMessageID = update.Message.MessageID
+	bot.Send(msg)
+}
+
+func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
 	re := regexp.MustCompile(`^(?P<pos>\d)\+(?P<char>[а-я])$`)
 	match := re.FindStringSubmatch(update.Message.Text)
 
@@ -236,12 +251,14 @@ func correctPosition(update tgbotapi.Update, g *game.Game, player int) {
 			p := match[posIndex]
 			pos, err := strconv.Atoi(p)
 			if err != nil {
-				//TODO: return error to user
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
 			}
-			g.AddCorrectPosition(player, c, pos)
+			count, err := g.AddCorrectPosition(player, c, pos)
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
 		}
-	} else {
-		//TODO: return error to user
 	}
 }
 
@@ -253,7 +270,7 @@ func runeAt(s string, i int) rune {
 	return runeSlice[i]
 }
 
-func incorrectPosition(update tgbotapi.Update, g *game.Game, player int) {
+func incorrectPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
 	re := regexp.MustCompile(`^(?P<pos>\d)\-(?P<char>[а-я])$`)
 	match := re.FindStringSubmatch(update.Message.Text)
 
@@ -265,11 +282,13 @@ func incorrectPosition(update tgbotapi.Update, g *game.Game, player int) {
 			p := match[posIndex]
 			pos, err := strconv.Atoi(p)
 			if err != nil {
-				//TODO: return error to user
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
 			}
-			g.AddIncorrectPosition(player, rune(c), pos)
+			count, err := g.AddIncorrectPosition(player, rune(c), pos)
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
 		}
-	} else {
-		//TODO: return error to user
 	}
 }

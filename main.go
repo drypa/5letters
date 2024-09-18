@@ -3,10 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"letters/game"
 	"letters/solver"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -125,35 +129,166 @@ func main() {
 			fmt.Println("Failed to save temp file")
 		}
 	}
+	g := game.NewGame()
 
-	notContains := []rune{'б', 'у', 'к', 'в', 'с', 'е', 'м', 'ь', 'я', 'р', 'о', 'з'}
-	contain := []rune{'п', 'а'}
-	correctPositions := []solver.RunePlace{
-		{Rune: 'а', Pos: 4},
-		{Rune: 'п', Pos: 0},
-	}
-	incorrectPositions := []solver.RunePlace{
-		{Rune: 'у', Pos: 1},
-		{Rune: 'в', Pos: 3},
-		{Rune: 'а', Pos: 4},
-		{Rune: 'с', Pos: 0},
-		{Rune: 'а', Pos: 1},
-		{Rune: 'у', Pos: 3},
-		{Rune: 'с', Pos: 4},
+	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if token == "" {
+		log.Fatal("TELEGRAM_BOT_TOKEN environment variable not set")
 	}
 
-	s := solver.NewSolver(letters5, 5)
-	s.Contains(contain)
-	s.NotContain(notContains)
-	s.CorrectRunePlaces(correctPositions)
-	s.IncorrectRunePlaces(incorrectPositions)
-	results := s.GetSuitable()
-	fmt.Println("Matching lines:")
-	if len(results) == 0 {
-		fmt.Println("not found")
-	} else {
-		for _, el := range results {
-			fmt.Println(el)
+	bot, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bot.Debug = true
+	log.Printf("Authorized on account %s", bot.Self.UserName)
+
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+
+	updates, err := bot.GetUpdatesChan(u)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for update := range updates {
+		if update.Message == nil {
+			continue
+		}
+		player := update.Message.From.ID
+		if update.Message.Text == "/start" {
+			g.AddPlayer(player, solver.NewSolver(letters5, 5))
+			sendResponse("New game started!", update, bot)
+			continue
+		}
+		notContainPrefix := "-"
+		if strings.HasPrefix(update.Message.Text, notContainPrefix) {
+			notContains := strings.TrimLeft(update.Message.Text, notContainPrefix)
+			count, err := g.AddNotContains(player, []rune(notContains))
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+			continue
+		}
+		containPrefix := "+"
+		if strings.HasPrefix(update.Message.Text, containPrefix) {
+			contains := strings.TrimLeft(update.Message.Text, containPrefix)
+			count, err := g.AddContains(player, []rune(contains))
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+			continue
+		}
+		correctPosition(update, g, player, bot)
+		incorrectPosition(update, g, player, bot)
+		if update.Message.Text == "/result" {
+			result, err := g.GetResult(player)
+			message := ""
+			if err != nil {
+				message = "Error!"
+			}
+			message = strings.Join(result, ",\n")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
+			msg.ReplyToMessageID = update.Message.MessageID
+
+			_, err = bot.Send(msg)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	//notContains := []rune{'б', 'у', 'к', 'в', 'с', 'е', 'м', 'ь', 'я', 'р', 'о', 'з'}
+	//contain := []rune{'п', 'а'}
+	//correctPositions := []solver.RunePlace{
+	//	{Rune: 'а', Pos: 4},
+	//	{Rune: 'п', Pos: 0},
+	//}
+	//incorrectPositions := []solver.RunePlace{
+	//	{Rune: 'у', Pos: 1},
+	//	{Rune: 'в', Pos: 3},
+	//	{Rune: 'а', Pos: 4},
+	//	{Rune: 'с', Pos: 0},
+	//	{Rune: 'а', Pos: 1},
+	//	{Rune: 'у', Pos: 3},
+	//	{Rune: 'с', Pos: 4},
+	//}
+	//
+	//s := solver.NewSolver(letters5, 5)
+	//s.Contains(contain)
+	//s.NotContain(notContains)
+	//s.CorrectRunePlaces(correctPositions)
+	//s.IncorrectRunePlaces(incorrectPositions)
+	//results := s.GetSuitable()
+	//fmt.Println("Matching lines:")
+	//if len(results) == 0 {
+	//	fmt.Println("not found")
+	//} else {
+	//	for _, el := range results {
+	//		fmt.Println(el)
+	//	}
+	//}
+}
+
+func sendResponse(message string, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
+	msg.ReplyToMessageID = update.Message.MessageID
+	bot.Send(msg)
+}
+
+func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
+	re := regexp.MustCompile(`^(?P<pos>\d)\+(?P<char>[а-я])$`)
+	match := re.FindStringSubmatch(update.Message.Text)
+
+	if len(match) > 0 {
+		charIndex := re.SubexpIndex("char")
+		posIndex := re.SubexpIndex("pos")
+		if charIndex != -1 && posIndex != -1 {
+			c := runeAt(match[charIndex], 0)
+			p := match[posIndex]
+			pos, err := strconv.Atoi(p)
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			count, err := g.AddCorrectPosition(player, c, pos)
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+		}
+	}
+}
+
+func runeAt(s string, i int) rune {
+	runeSlice := []rune(s)
+	if i >= len(runeSlice) || i < 0 {
+		return -1
+	}
+	return runeSlice[i]
+}
+
+func incorrectPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
+	re := regexp.MustCompile(`^(?P<pos>\d)\-(?P<char>[а-я])$`)
+	match := re.FindStringSubmatch(update.Message.Text)
+
+	if len(match) > 0 {
+		charIndex := re.SubexpIndex("char")
+		posIndex := re.SubexpIndex("pos")
+		if charIndex != -1 && posIndex != -1 {
+			c := match[charIndex][0]
+			p := match[posIndex]
+			pos, err := strconv.Atoi(p)
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			count, err := g.AddIncorrectPosition(player, rune(c), pos)
+			if err != nil {
+				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+			}
+			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
 		}
 	}
 }

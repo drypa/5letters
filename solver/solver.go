@@ -67,7 +67,7 @@ func (s *Solver) IncorrectRunePlaces(runes []RunePlace) {
 
 func (s *Solver) GetSuitable() []string {
 	result := s.allWords
-	if s.containRune != nil && len(s.notContainRune) > 0 {
+	if s.containRune != nil && len(s.containRune) > 0 {
 		result = contains(result, s.containRune)
 	}
 	if s.notContainRune != nil && len(s.notContainRune) > 0 {

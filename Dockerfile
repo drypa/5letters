@@ -1,6 +1,9 @@
 FROM golang:alpine3.20 AS build
-COPY . /src
 WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . /src
+
 RUN CGO_ENABLED=0 go build -o bot
 
 FROM alpine:3.20.3

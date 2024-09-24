@@ -1,0 +1,9 @@
+version: '2'
+
+services:
+  bot:
+    image: ghcr.io/drypa/5letters:master
+    restart: unless-stopped
+    container_name: letters_bot
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}

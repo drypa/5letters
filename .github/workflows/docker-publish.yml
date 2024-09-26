@@ -21,8 +21,22 @@ env:
 
 
 jobs:
+  prepare:
+    name: Prepare build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get next version
+        uses: reecetech/version-increment@2023.10.2
+        id: version
+        with:
+          scheme: semver
+          increment: patch
   build:
-
+    name: Build
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,13 +46,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: Get next version
-        uses: reecetech/version-increment@2024.4.3
-        id: version
-        with:
-          scheme: semver
-          increment: patch
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -83,7 +90,7 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.version.outputs.version }}
-          labels: "v${{ steps.meta.outputs.labels }}"
+          labels: "v${{ needs.prepare.outputs.version }}"
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

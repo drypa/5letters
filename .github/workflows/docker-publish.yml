@@ -89,8 +89,8 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.version.outputs.version }}
-          labels: "v${{ needs.prepare.outputs.version }}"
+          tags: "v${{ needs.prepare.outputs.version }}"
+          labels: "v${{ steps.meta.outputs.labels }}"
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -32,6 +32,13 @@ jobs:
       id-token: write
 
     steps:
+      - name: Get next version
+        uses: reecetech/version-increment@2024.4.3
+        id: version
+        with:
+          scheme: semver
+          increment: patch
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -75,8 +82,8 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.version.outputs.version }}
+          labels: "v${{ steps.meta.outputs.labels }}"
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

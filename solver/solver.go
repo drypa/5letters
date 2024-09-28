@@ -5,7 +5,7 @@ type Solver struct {
 	containRune         []rune
 	notContainRune      []rune
 	correctRunePlaces   []rune
-	incorrectRunePlaces []rune
+	incorrectRunePlaces []RunePlace
 }
 
 type RunePlace struct {
@@ -17,7 +17,7 @@ func NewSolver(words []string, len int) *Solver {
 	return &Solver{
 		allWords:            words,
 		correctRunePlaces:   make([]rune, len),
-		incorrectRunePlaces: make([]rune, len),
+		incorrectRunePlaces: make([]RunePlace, 0),
 	}
 }
 
@@ -61,7 +61,7 @@ func (s *Solver) CorrectRunePlaces(runes []RunePlace) {
 // IncorrectRunePlaces append runes in incorrect places.
 func (s *Solver) IncorrectRunePlaces(runes []RunePlace) {
 	for _, r := range runes {
-		s.incorrectRunePlaces[r.Pos] = r.Rune
+		s.incorrectRunePlaces = append(s.incorrectRunePlaces, r)
 	}
 }
 

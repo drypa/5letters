@@ -55,12 +55,12 @@ func correctRunePlaces(lines []string, runes []rune) []string {
 	return result
 }
 
-func incorrectRunePlaces(lines []string, runes []rune) []string {
+func incorrectRunePlaces(lines []string, runes []RunePlace) []string {
 	var result []string
 	for _, line := range lines {
 		containAny := false
-		for i, r := range runes {
-			if r != 0 && runeAt(line, i) == r {
+		for _, r := range runes {
+			if runeAt(line, r.Pos) == r.Rune {
 				containAny = true
 				break
 			}

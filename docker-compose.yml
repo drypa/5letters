@@ -2,7 +2,7 @@ version: '2'
 
 services:
   bot:
-    image: ghcr.io/drypa/5letters:master
+    image: ghcr.io/drypa/5letters:latest
     restart: unless-stopped
     container_name: letters_bot
     environment:

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/pkg/errors"
 	"letters/game"
 	"letters/solver"
 	"log"
@@ -15,6 +16,8 @@ import (
 	"sync"
 	"unicode/utf8"
 )
+
+var wrongCommandError = errors.New("wrong command")
 
 func loadWords(url string, lines chan<- string, wg *sync.WaitGroup) {
 	defer wg.Done() // Уменьшаем счетчик горутин
@@ -250,24 +253,34 @@ func runeAt(s string, i int) rune {
 }
 
 func incorrectPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
-	re := regexp.MustCompile(`^(?P<pos>\d)\-(?P<char>[а-я])$`)
-	match := re.FindStringSubmatch(update.Message.Text)
+	c, pos, err := getIncorrectCharPositionFromRequest(update.Message.Text)
+
+	if err != nil {
+		if !errors.Is(err, wrongCommandError) {
+			sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+		}
+	}
+	count, err := g.AddIncorrectPosition(player, c, pos)
+	if err != nil {
+		sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+	}
+	sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+}
+
+func getIncorrectCharPositionFromRequest(message string) (rune, int, error) {
+	re := regexp.MustCompile(`^(?P<pos>\d)-(?P<char>[а-я])$`)
+	match := re.FindStringSubmatch(message)
 
 	if len(match) > 0 {
 		charIndex := re.SubexpIndex("char")
 		posIndex := re.SubexpIndex("pos")
 		if charIndex != -1 && posIndex != -1 {
-			c := match[charIndex][0]
+			c := []rune(match[charIndex])[0]
 			p := match[posIndex]
 			pos, err := strconv.Atoi(p)
-			if err != nil {
-				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
-			}
-			count, err := g.AddIncorrectPosition(player, rune(c), pos)
-			if err != nil {
-				sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
-			}
-			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+
+			return c, pos, err
 		}
 	}
+	return 0, 0, errors.New("wrong command")
 }

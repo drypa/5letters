@@ -191,52 +191,31 @@ func main() {
 				message = "Error!"
 			}
 			message = strings.Join(result, ",\n")
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
-			msg.ReplyToMessageID = update.Message.MessageID
+			sendResponse(message, update, bot)
 
-			_, err = bot.Send(msg)
 			if err != nil {
 				log.Println(err)
 			}
 		}
 	}
-
-	//notContains := []rune{'б', 'у', 'к', 'в', 'с', 'е', 'м', 'ь', 'я', 'р', 'о', 'з'}
-	//contain := []rune{'п', 'а'}
-	//correctPositions := []solver.RunePlace{
-	//	{Rune: 'а', Pos: 4},
-	//	{Rune: 'п', Pos: 0},
-	//}
-	//incorrectPositions := []solver.RunePlace{
-	//	{Rune: 'у', Pos: 1},
-	//	{Rune: 'в', Pos: 3},
-	//	{Rune: 'а', Pos: 4},
-	//	{Rune: 'с', Pos: 0},
-	//	{Rune: 'а', Pos: 1},
-	//	{Rune: 'у', Pos: 3},
-	//	{Rune: 'с', Pos: 4},
-	//}
-	//
-	//s := solver.NewSolver(letters5, 5)
-	//s.Contains(contain)
-	//s.NotContain(notContains)
-	//s.CorrectRunePlaces(correctPositions)
-	//s.IncorrectRunePlaces(incorrectPositions)
-	//results := s.GetSuitable()
-	//fmt.Println("Matching lines:")
-	//if len(results) == 0 {
-	//	fmt.Println("not found")
-	//} else {
-	//	for _, el := range results {
-	//		fmt.Println(el)
-	//	}
-	//}
 }
+
+var replyKeyboard = tgbotapi.NewReplyKeyboard(
+	tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("/start"),
+		tgbotapi.NewKeyboardButton("/result"),
+	),
+)
 
 func sendResponse(message string, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, message)
 	msg.ReplyToMessageID = update.Message.MessageID
-	bot.Send(msg)
+	msg.ReplyMarkup = replyKeyboard
+	_, err := bot.Send(msg)
+
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {

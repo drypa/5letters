@@ -185,8 +185,12 @@ func main() {
 			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
 			continue
 		}
-		correctPosition(update, g, player, bot)
-		incorrectPosition(update, g, player, bot)
+		if correctPosition(update, g, player, bot) {
+			continue
+		}
+		if incorrectPosition(update, g, player, bot) {
+			continue
+		}
 		if update.Message.Text == "/result" {
 			result, err := g.GetResult(player)
 			message := ""
@@ -199,7 +203,9 @@ func main() {
 			if err != nil {
 				log.Println(err)
 			}
+			continue
 		}
+		sendResponse("Wrong command", update, bot)
 	}
 }
 
@@ -221,7 +227,8 @@ func sendResponse(message string, update tgbotapi.Update, bot *tgbotapi.BotAPI) 
 	}
 }
 
-func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
+func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) bool {
+	processed := false
 	re := regexp.MustCompile(`^(?P<pos>\d)\+(?P<char>[а-я])$`)
 	match := re.FindStringSubmatch(update.Message.Text)
 
@@ -229,6 +236,7 @@ func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbo
 		charIndex := re.SubexpIndex("char")
 		posIndex := re.SubexpIndex("pos")
 		if charIndex != -1 && posIndex != -1 {
+			processed = true
 			c := runeAt(match[charIndex], 0)
 			p := match[posIndex]
 			pos, err := strconv.Atoi(p)
@@ -242,6 +250,7 @@ func correctPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbo
 			sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
 		}
 	}
+	return processed
 }
 
 func runeAt(s string, i int) rune {
@@ -252,19 +261,23 @@ func runeAt(s string, i int) rune {
 	return runeSlice[i]
 }
 
-func incorrectPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) {
+func incorrectPosition(update tgbotapi.Update, g *game.Game, player int, bot *tgbotapi.BotAPI) bool {
+	processed := false
 	c, pos, err := getIncorrectCharPositionFromRequest(update.Message.Text)
 
 	if err != nil {
 		if !errors.Is(err, wrongCommandError) {
 			sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
 		}
+	} else {
+		count, err := g.AddIncorrectPosition(player, c, pos)
+		processed = true
+		if err != nil {
+			sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
+		}
+		sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
 	}
-	count, err := g.AddIncorrectPosition(player, c, pos)
-	if err != nil {
-		sendResponse(fmt.Sprintf("Error: %v", err), update, bot)
-	}
-	sendResponse(fmt.Sprintf("Sutable words count: %d", count), update, bot)
+	return processed
 }
 
 func getIncorrectCharPositionFromRequest(message string) (rune, int, error) {
@@ -282,5 +295,5 @@ func getIncorrectCharPositionFromRequest(message string) (rune, int, error) {
 			return c, pos, err
 		}
 	}
-	return 0, 0, errors.New("wrong command")
+	return 0, 0, wrongCommandError
 }
